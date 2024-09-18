@@ -1,5 +1,5 @@
 # MobileAsg
-Guide:
+Guide to use github:
 1. Fetch before u start coding
 2. Open a new branch
 3. When the feature is done (best no error), commit then push
