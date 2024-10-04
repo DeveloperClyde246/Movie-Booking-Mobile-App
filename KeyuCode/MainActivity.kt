@@ -68,7 +68,7 @@ class MainActivity : ComponentActivity() {
         // Initialize Firebase Firestore
         db = Firebase.firestore
         setContent {
-             MyApp(db)
+            MyApp(db)
         }
     }
 }
@@ -247,8 +247,10 @@ fun MyApp(db: FirebaseFirestore) {
                         language = language, // Example static value, you can update this dynamically
                         cinema = cinemaLocation,
                         onNavigateBack = { navController.popBackStack() },
-                        onNavigateNext = { movieName, estimateTime, cinema, time, experience, selectedDate  ->
-                            navController.navigate("seatSelection/$movieName/$estimateTime/$cinema/$time/$experience/$selectedDate")
+                        onNavigateNext = { movieDetails1 ->
+                            navController.navigate(
+                                "seatSelection/${movieDetails1.movieName}/${movieDetails1.estimateTime}/${movieDetails1.cinemaLocation}/${movieDetails1.selectedTime}/${movieDetails1.selectedExperience}/${movieDetails1.selectedDate}"
+                            )
                         }
                     )
                 }
@@ -279,10 +281,12 @@ fun MyApp(db: FirebaseFirestore) {
                         selectedDate = selectedDate,
                         availableShowtime = time,
                         onNavigateBack = { navController.popBackStack() },
-                        onNavigateNext = { movieName,cinemaLocation, selectedTime, selectedExperience, selectedDate, selectedSeats, cinemaHall ->
-                            // Navigate to ConfirmTicketBooking screen
-                            val selectedSeatsString = selectedSeats.joinToString(",")
-                            navController.navigate("confirmTicketBooking/$movieName/$cinemaLocation/$selectedTime/$selectedExperience/$selectedDate/$selectedSeatsString/$cinemaHall")
+                        onNavigateNext = { movieDetails2 ->
+                            // Navigate to ConfirmTicketBooking screen using the combined MovieDetails2
+                            navController.navigate(
+                                "confirmTicketBooking/${movieDetails2.movieName}/${movieDetails2.cinemaLocation}/${movieDetails2.selectedTime}/${movieDetails2.selectedExperience}/${movieDetails2.selectedDate}/${movieDetails2.availableShowtime}/${movieDetails2.cinemaHall}/" +
+                                        movieDetails2.selectedSeats.joinToString(",")
+                            )
                         }
                     )
                 }
@@ -317,9 +321,10 @@ fun MyApp(db: FirebaseFirestore) {
                         cinemaHall = cinemaHall,
                         onNavigateBack = { navController.popBackStack() },
                         onConfirm = {
-                                movieName, cinemaLocation, selectedTime, selectedExperience, selectedDate, selectedSeats, cinemaHall, ticketDetails ->
+                                MovieDetails3 ->
                             navController.navigate(
-                                "reviewSummary/$movieName/$cinemaLocation/$selectedTime/$selectedExperience/$selectedDate/${selectedSeats.joinToString(",")}/$cinemaHall/${serializeTicketDetails(ticketDetails)}"
+                                "reviewSummary/${MovieDetails3.movieName}/${MovieDetails3.cinemaLocation}/${MovieDetails3.selectedTime}/${MovieDetails3.movieExperience}/${MovieDetails3.selectedDate}/${MovieDetails3.selectedSeats.joinToString(",")}" +
+                                        "/${MovieDetails3.cinemaHall}/${MovieDetails3.ticketCounts.entries.joinToString(",") { "${it.key}:${it.value}" }}"
                             )
                         }
                     )
