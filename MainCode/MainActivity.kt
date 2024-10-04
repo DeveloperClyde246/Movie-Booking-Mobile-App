@@ -41,6 +41,8 @@ import com.example.moviemenu.admin.AdminMainPage
 import com.example.moviemenu.admin.ApproveRefundPage
 import com.example.moviemenu.admin.RefundRequest
 import com.example.moviemenu.database.AppDatabase
+import com.example.moviemenu.database.BookingRepositoryImpl
+import com.example.moviemenu.database.PaymentRepositorylmpl
 import com.example.moviemenu.menu.CinemaMenuSearchScreen
 import com.example.moviemenu.menu.MovieManageScreen
 
@@ -248,33 +250,31 @@ fun MyApp(db: FirebaseFirestore) {
                         estimateTime = estimateTime, // Example static value, you can update this dynamically
                         language = language, // Example static value, you can update this dynamically
                         cinema = cinemaLocation,
-                        onNavigateBack = { navController.popBackStack() },
-                        onNavigateNext = { movieDetails1 ->
-                            navController.navigate(
-                                "seatSelection/${movieDetails1.movieName}/${movieDetails1.estimateTime}/${movieDetails1.cinemaLocation}/${movieDetails1.selectedTime}/${movieDetails1.selectedExperience}/${movieDetails1.selectedDate}"
-                            )
-                        }
+                        navController = navController,
+                        bookingRepository = BookingRepositoryImpl(AppDatabase.getDatabase(navController.context).bookingDao())
                     )
+                    GlobalVariables.cinemaLocations=cinemaLocation
                 }
                 // Seat Selection page navigation
                 composable(
-                    "seatSelection/{movieName}/{estimateTime}/{cinema}/{time}/{experience}/{selectedDate}",
+                    route = "seatsSelection/{movieName}/{cinemaLocation}/{selectedTime}/{selectedExperience}/{selectedDate}/{availableShowtime}/{cinemaHall}/{estimateTime}",
                     arguments = listOf(
                         navArgument("movieName") { type = NavType.StringType },
-                        navArgument("estimateTime") { type = NavType.StringType },
-                        navArgument("cinema") { type = NavType.StringType },
-                        navArgument("time") { type = NavType.StringType },
-                        navArgument("experience") { type = NavType.StringType },
-                        navArgument("selectedDate") { type = NavType.StringType }
+                        navArgument("cinemaLocation") { type = NavType.StringType },
+                        navArgument("selectedTime") { type = NavType.StringType },
+                        navArgument("selectedExperience") { type = NavType.StringType },
+                        navArgument("selectedDate") { type = NavType.StringType },
+                        navArgument("availableShowtime") { type = NavType.StringType },
+                        navArgument("cinemaHall") { type = NavType.StringType }
                     )
                 ) { backStackEntry ->
                     val movieName = backStackEntry.arguments?.getString("movieName") ?: ""
                     val estimateTime = backStackEntry.arguments?.getString("estimateTime") ?: ""
                     val cinema = backStackEntry.arguments?.getString("cinema") ?: ""
-                    val time = backStackEntry.arguments?.getString("time") ?: ""
-                    val experience = backStackEntry.arguments?.getString("experience") ?: ""
+                    val time = backStackEntry.arguments?.getString("availableShowtime") ?: ""
+                    val experience = backStackEntry.arguments?.getString("selectedExperience") ?: ""
                     val selectedDate = backStackEntry.arguments?.getString("selectedDate") ?: ""
-
+                    val cinemaHall = backStackEntry.arguments?.getString("cinemaHall") ?: ""
                     SeatsSelectionPage(
                         movieName = movieName,
                         estimateTime = estimateTime,
@@ -282,6 +282,7 @@ fun MyApp(db: FirebaseFirestore) {
                         cinemaLocation = cinema,
                         selectedDate = selectedDate,
                         availableShowtime = time,
+                        cinemaHall=cinemaHall,
                         onNavigateBack = { navController.popBackStack() },
                         onNavigateNext = { movieDetails2 ->
                             // Navigate to ConfirmTicketBooking screen using the combined MovieDetails2
@@ -291,6 +292,7 @@ fun MyApp(db: FirebaseFirestore) {
                             )
                         }
                     )
+                    GlobalVariables.experience=experience
                 }
                 // Confirm Ticket Booking navigation
                 // Confirm Ticket Booking navigation
@@ -327,7 +329,8 @@ fun MyApp(db: FirebaseFirestore) {
                                 movieName, cinemaLocation, selectedTime, selectedExperience, selectedDate, selectedSeats, cinemaHall, ticketDetails ->
                             navController.navigate(
                                 "reviewSummary/$movieName/$cinemaLocation/$selectedTime/$selectedExperience/$selectedDate/${selectedSeats.joinToString(",")}/$cinemaHall/${serializeTicketDetails(ticketDetails)}")
-                        }
+                        },
+                        bookingRepository = BookingRepositoryImpl(AppDatabase.getDatabase(navController.context).bookingDao())
                     )
                 }
                 // Review Summary Page navigation
@@ -356,22 +359,25 @@ fun MyApp(db: FirebaseFirestore) {
                     // Deserialize the ticket details string back to a map
                     val ticketDetails = deserializeTicketDetails(ticketDetailsString)
 
-                    ReviewSummaryPage(
-                        onNavigateBack = { navController.popBackStack() },
-                        onNavigateToPayment = { movieName, cinemaLocation, totalPrice, ticketDetails, cinemaHall, selectedSeats, selectedDate, selectedTime ->
-                            val ticketDetailsString = serializeTicketDetails(ticketDetails)
-                            navController.navigate(
-                                "paymentPage/$movieName/$cinemaLocation/$totalPrice/$ticketDetailsString/$cinemaHall/${selectedSeats.joinToString(",")}/$selectedDate/$selectedTime"
-                            )
-                        },
-                        movieName = movieName, // You can pass the actual movie name
-                        cinemaLocation = cinema,
-                        selectedDate = selectedDate,
-                        selectedTime = time,
-                        selectedSeats = selectedSeats,
-                        cinemaHall = cinemaHall,
-                        ticketDetails = ticketDetails
-                    )
+                    GlobalVariables.cinemaLocations?.let {
+                        ReviewSummaryPage(
+                            onNavigateBack = { navController.popBackStack() },
+                            onNavigateToPayment = { movieName, cinemaLocation, totalPrice, ticketDetails, cinemaHall, selectedSeats, selectedDate, selectedTime ->
+                                val ticketDetailsString = serializeTicketDetails(ticketDetails)
+                                navController.navigate(
+                                    "paymentPage/$movieName/$cinemaLocation/$totalPrice/$ticketDetailsString/$cinemaHall/${selectedSeats.joinToString(",")}/$selectedDate/$selectedTime"
+                                )
+                            },
+                            movieName = movieName, // You can pass the actual movie name
+                            cinemaLocation = it,
+                            selectedDate = selectedDate,
+                            selectedTime = time,
+                            selectedSeats = selectedSeats,
+                            cinemaHall = cinemaHall,
+                            ticketDetails = ticketDetails,
+                            bookingRepository = BookingRepositoryImpl(AppDatabase.getDatabase(navController.context).bookingDao())
+                        )
+                    }
                 }
 
                 // Payment page navigation
@@ -442,7 +448,10 @@ fun MyApp(db: FirebaseFirestore) {
                         selectedDate = selectedDate,
                         selectedTime = selectedTime,
                         cinemaLocation = cinemaLocation,
-                        totalPrice = totalPrice
+                        totalPrice = totalPrice,
+                        paymentRepository = PaymentRepositorylmpl(
+                            AppDatabase.getDatabase(navController.context).paymentDao()
+                        )
                     )
                 }
 
@@ -466,5 +475,8 @@ fun deserializeTicketDetails(ticketDetailsString: String): Map<String, Int> {
     }.toMap()
 }
 
+object GlobalVariables{
+    var cinemaLocations: String? = ""
+    var experience: String? = ""
 
-
+}
