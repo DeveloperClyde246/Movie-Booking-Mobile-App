@@ -3,7 +3,6 @@ package com.example.moviemenu
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,6 +21,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -29,7 +29,6 @@ import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -37,16 +36,16 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.movie_booking.RefundPage
+import com.example.moviemenu.FoodAndBeverage.CartManager
+import com.example.moviemenu.FoodAndBeverage.CartPage
+import com.example.moviemenu.FoodAndBeverage.FoodAndBeverageMenu
 import com.example.moviemenu.admin.AdminMainPage
 import com.example.moviemenu.admin.ApproveRefundPage
 import com.example.moviemenu.admin.RefundRequest
-import com.example.moviemenu.database.AppDatabase
 import com.example.moviemenu.menu.CinemaMenuSearchScreen
 import com.example.moviemenu.menu.MovieManageScreen
-
 import com.example.moviemenu.order.ConfirmTicketBooking
 import com.example.moviemenu.order.DateCinemaLocationSelectionPage
-import com.example.moviemenu.order.MovieDetails3
 import com.example.moviemenu.order.ReviewSummaryPage
 import com.example.moviemenu.order.SeatsSelectionPage
 import com.example.moviemenu.payment.PaymentModeScreen
@@ -55,8 +54,6 @@ import com.google.firebase.Firebase
 import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.firestore
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -67,14 +64,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        GlobalScope.launch {
-            AppDatabase.getDatabase(applicationContext).bookingDao().getAllBookings()
-        }
         FirebaseApp.initializeApp(this)
         // Initialize Firebase Firestore
         db = Firebase.firestore
         setContent {
-            MyApp(db)
+             MyApp(db)
         }
     }
 }
@@ -169,11 +163,11 @@ fun Footer(navController: NavController) {
 
         // F&B Button
         Button(
-            onClick = { /* Navigate to F&B screen */ },
+            onClick = { navController.navigate("foodAndBeverageMenu") },
             modifier = Modifier.weight(1f),
             colors = ButtonDefaults.buttonColors(colorResource(R.color.dark_gray))
         ) {
-            Text(text = "F&B", color = Color.White, fontSize = 9.sp)  // Smaller text
+            Text(text = "F&B", color = Color.White, fontSize = 9.sp)
         }
 
         // Profile Button
@@ -197,6 +191,9 @@ fun formatDate(date: Date): String {
 @Composable
 fun MyApp(db: FirebaseFirestore) {
     val navController = rememberNavController()
+
+    val cartManager = remember { CartManager() }
+
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.SpaceBetween
@@ -250,10 +247,8 @@ fun MyApp(db: FirebaseFirestore) {
                         language = language, // Example static value, you can update this dynamically
                         cinema = cinemaLocation,
                         onNavigateBack = { navController.popBackStack() },
-                        onNavigateNext = { movieDetails1 ->
-                            navController.navigate(
-                                "seatSelection/${movieDetails1.movieName}/${movieDetails1.estimateTime}/${movieDetails1.cinemaLocation}/${movieDetails1.selectedTime}/${movieDetails1.selectedExperience}/${movieDetails1.selectedDate}"
-                            )
+                        onNavigateNext = { movieName, estimateTime, cinema, time, experience, selectedDate  ->
+                            navController.navigate("seatSelection/$movieName/$estimateTime/$cinema/$time/$experience/$selectedDate")
                         }
                     )
                 }
@@ -284,13 +279,10 @@ fun MyApp(db: FirebaseFirestore) {
                         selectedDate = selectedDate,
                         availableShowtime = time,
                         onNavigateBack = { navController.popBackStack() },
-                        onNavigateNext = { movieDetails2 ->
-                            // Navigate to ConfirmTicketBooking screen using the combined MovieDetails2
-                            navController.navigate(
-                                "confirmTicketBooking/${movieDetails2.movieName}/${movieDetails2.cinemaLocation}/${movieDetails2.selectedTime}/${movieDetails2.selectedExperience}/${movieDetails2.selectedDate}/${movieDetails2.availableShowtime}/${movieDetails2.cinemaHall}/" +
-                                        movieDetails2.selectedSeats.joinToString(",")
-
-                            )
+                        onNavigateNext = { movieName,cinemaLocation, selectedTime, selectedExperience, selectedDate, selectedSeats, cinemaHall ->
+                            // Navigate to ConfirmTicketBooking screen
+                            val selectedSeatsString = selectedSeats.joinToString(",")
+                            navController.navigate("confirmTicketBooking/$movieName/$cinemaLocation/$selectedTime/$selectedExperience/$selectedDate/$selectedSeatsString/$cinemaHall")
                         }
                     )
                 }
@@ -325,10 +317,9 @@ fun MyApp(db: FirebaseFirestore) {
                         cinemaHall = cinemaHall,
                         onNavigateBack = { navController.popBackStack() },
                         onConfirm = {
-                                MovieDetails3 ->
+                                movieName, cinemaLocation, selectedTime, selectedExperience, selectedDate, selectedSeats, cinemaHall, ticketDetails ->
                             navController.navigate(
-                                "reviewSummary/${MovieDetails3.movieName}/${MovieDetails3.cinemaLocation}/${MovieDetails3.selectedTime}/${MovieDetails3.movieExperience}/${MovieDetails3.selectedDate}/${MovieDetails3.selectedSeats.joinToString(",")}" +
-                                        "/${MovieDetails3.cinemaHall}/${MovieDetails3.ticketCounts.entries.joinToString(",") { "${it.key}:${it.value}" }}"
+                                "reviewSummary/$movieName/$cinemaLocation/$selectedTime/$selectedExperience/$selectedDate/${selectedSeats.joinToString(",")}/$cinemaHall/${serializeTicketDetails(ticketDetails)}"
                             )
                         }
                     )
@@ -376,7 +367,6 @@ fun MyApp(db: FirebaseFirestore) {
                         ticketDetails = ticketDetails
                     )
                 }
-
                 // Payment page navigation
                 composable(
                     "paymentPage/{movieName}/{cinemaLocation}/{totalPrice}/{ticketDetails}/{cinemaHall}/{selectedSeats}/{selectedDate}/{selectedTime}",
@@ -449,6 +439,19 @@ fun MyApp(db: FirebaseFirestore) {
                     )
                 }
 
+                composable("foodAndBeverageMenu") {
+                    FoodAndBeverageMenu(navController, cartManager)
+                }
+
+                composable("cartScreen") {
+                    CartPage(
+                        navController = navController,
+                        cartItems = cartManager.cartItems, // Access cartItems from CartManager
+                        onRemoveFromCart = { item ->
+                            cartManager.removeFromCart(item) // Remove item from cart
+                        }
+                    )
+                }
 
                 // ------------
             }
